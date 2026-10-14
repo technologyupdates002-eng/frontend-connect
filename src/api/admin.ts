@@ -141,13 +141,13 @@ export const treasurerApi = {
   updateOrgSettings: (data: Partial<OrganizationSettings>) =>
     api.patch<{ message: string }>('/treasurer/settings', data),
 
-  getPayouts: () => api.get<Payout[]>('/treasurer/payouts'),
+  getPayouts: async () => (await api.get<{ data: Payout[] }>('/admin/payouts')).data,
 
   createPayout: (data: { member_id: string; payout_type: PayoutType; amount: number; reason: string; phone: string; wallet_type: string }) =>
-    api.post<Payout>('/treasurer/payouts', data),
+    api.post<{ data: Payout }>('/admin/payouts', { ...data, phone_number: data.phone }).then(result => result.data),
 
   getEligibleMembers: (payoutType: PayoutType) =>
-    api.get<EligibleMember[]>('/treasurer/payouts/eligible', { payout_type: payoutType }),
+    api.get<{ data: EligibleMember[] }>('/admin/payouts/eligible', { payout_type: payoutType }).then(result => result.data),
 };
 
 export const adminApi = {
@@ -192,7 +192,10 @@ export const adminApi = {
   matchPayment: (id: string, memberId: string) =>
     api.post<{ message: string }>(`/admin/unmatched/${id}/match`, { member_id: memberId }),
 
-  getNotifications: () => api.get<Notification[]>('/admin/notifications'),
+  getNotifications: async () => {
+    const result = await api.get<{ data: Array<Notification & { is_read?: boolean; created_at?: string }> }>('/admin/notifications/inbox');
+    return result.data.map(item => ({ ...item, read: item.is_read ?? item.read, date: item.created_at ?? item.date }));
+  },
 
   sendBulkSms: (data: { message: string; recipients: string[] }) =>
     api.post<{ message: string }>('/admin/sms', data),

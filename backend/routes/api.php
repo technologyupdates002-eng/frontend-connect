@@ -61,6 +61,7 @@ Route::prefix('/auth')->group(function () {
     Route::get('/me', [AuthController::class, 'user'])->middleware('auth.jwt', 'throttle:api');
     Route::post('/refresh', [AuthController::class, 'token'])->middleware('throttle:login');
     Route::post('/change-password', [AuthController::class, 'changePassword'])->middleware('auth.jwt', 'throttle:api');
+    Route::post('/force-password-change', [AuthController::class, 'forcePasswordChange'])->middleware('auth.jwt', 'throttle:api');
 });
 
 Route::get('/admin/password-management/users', [AuthController::class, 'passwordManagementUsers'])

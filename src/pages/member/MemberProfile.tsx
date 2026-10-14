@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/auth/AuthContext';
 import { initials } from '@/lib/format';
 import type { Member } from '@/types';
+import { AppearanceSettings } from '@/components/AppearanceProvider';
 
 interface ProfileForm {
   name: string;
@@ -75,8 +76,8 @@ export default function MemberProfile() {
     setPhotoUploading(true);
     setPhotoError('');
     try {
-      await mockMember.uploadProfilePhoto({ file, userId: user.id });
-      await mockMember.updateProfile({ avatar: `/profile-images/${user.id}/profile.png` } as any);
+      const uploaded = await mockMember.uploadProfilePhoto({ file, userId: user.id });
+      await mockMember.updateProfile({ avatar: uploaded.url });
       qc.invalidateQueries({ queryKey: queryKeys.memberProfile });
     } catch {
       setPhotoError('Failed to upload photo. Please try again.');
@@ -186,6 +187,11 @@ export default function MemberProfile() {
             )}
           </div>
         </form>
+      </Card>
+
+      <Card className="p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-4">Set your theme</h3>
+        <AppearanceSettings />
       </Card>
 
       {/* Password change */}
