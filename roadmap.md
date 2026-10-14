@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Replace dashboard backgrounds with the six uploaded images; preserve layout and add readable dark themes and theme settings.
+- [ ] Restore missing public website images without redesigning pages.
+- [ ] Recheck frontend/Laravel contracts and document remaining live-verification blockers without running Laravel.
+
 - [x] Frontend preview in demo mode
 - [x] Restore Lovable theme backgrounds (sky, gold, crimson, pearl, morning)
 - [x] Backend: API gap audit (frontend calls vs Laravel routes)

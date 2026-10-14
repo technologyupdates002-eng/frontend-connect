@@ -20,7 +20,7 @@ export const authApi = {
   me: () => api.get<AuthUser>('/auth/me'),
 
   changePassword: (data: { current_password: string; new_password: string; new_password_confirmation: string }) =>
-    api.post<{ message: string }>('/auth/password', data),
+    api.post<{ message: string }>('/auth/change-password', data),
 
   forcePasswordChange: (data: { new_password: string; new_password_confirmation: string }) =>
     api.post<{ message: string }>('/auth/force-password-change', data),

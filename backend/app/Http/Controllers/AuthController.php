@@ -422,4 +422,21 @@ class AuthController extends Controller
 
         return response()->json($users);
     }
+
+    public function forcePasswordChange(Request $request): JsonResponse
+    {
+        $identity = $request->attributes->get('identity');
+        $data = $request->validate([
+            'new_password' => 'required|string|min:8|confirmed',
+        ]);
+        $user = DB::table('auth_users')->where('id', $identity['user_id'])->first();
+        if (! $user || ! $user->must_change_password) {
+            throw new HttpException(403, 'password_change_not_required', 'Use the normal password change with your current password.');
+        }
+        DB::table('auth_users')->where('id', $identity['user_id'])->update([
+            'encrypted_password' => AuthService::hashPassword($data['new_password']),
+            'must_change_password' => 0, 'updated_at' => now(),
+        ]);
+        return response()->json(['message' => 'Password updated.']);
+    }
 }

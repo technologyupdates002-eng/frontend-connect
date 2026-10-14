@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\WebsiteContactController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
+    Route::get('auth/appearance', [\App\Http\Controllers\Api\V1\AppearanceController::class, 'show']);
+    Route::put('auth/appearance', [\App\Http\Controllers\Api\V1\AppearanceController::class, 'update']);
     Route::prefix('member')->group(function () {
         Route::get('dashboard', [M::class, 'dashboard']);
         Route::get('contributions', [M::class, 'contributions']);

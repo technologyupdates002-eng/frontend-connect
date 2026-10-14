@@ -71,7 +71,7 @@ export const viceSecretaryApi = {
 
 export const signatureApi = {
   getCurrent: (role: string) => api.get<{ url: string; uploaded_at: string } | null>(`/signatures/current?role=${role}`),
-  upload: (data: { role: string; file_name: string }) => api.post<{ message: string; url: string }>('/signatures', data),
+  upload: (data: { signatory_role: string; signature_url: string }) => api.post<{ data: { signature_url: string } }>('/signatures', data),
 };
 
 export const chairpersonApi = {

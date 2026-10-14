@@ -102,7 +102,7 @@ export default function TreasurerSettings() {
         <Card className="p-5">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
-              <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2"><Palette size={16} className="text-primary-500" /> Portal Appearance</h3>
+              <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2"><Palette size={16} className="text-primary-500" /> Set your theme</h3>
               <p className="text-sm text-neutral-500 mt-1">Choose the background style for the private member and staff portal. The public website keeps its standard appearance.</p>
             </div>
           </div>

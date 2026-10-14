@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const switchRole = useCallback((role: UserRole) => {
     if (!demoMode || !user) return;
     const updated: AuthUser = {
-      ...user!,
+      ...user,
       role,
       name: role === 'member' ? 'Dr. Sarah Wanjiku Mwangi'
         : role === 'admin' ? 'Admin User'
@@ -88,7 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updatePassword = useCallback(async (current: string, next: string) => {
     if (!demoMode) {
-      await authApi.changePassword({
+      if (user?.must_change_password) {
+        await authApi.forcePasswordChange({ new_password: next, new_password_confirmation: next });
+      } else await authApi.changePassword({
         current_password: current,
         new_password: next,
         new_password_confirmation: next,

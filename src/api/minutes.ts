@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, getStoredUser } from './client';
 
 export type MinuteStatus =
   | 'draft'
@@ -101,10 +101,14 @@ export const minutesApi = {
   getSignature: (role: 'secretary' | 'chairperson') =>
     api.get<SignatureInfo | null>(`/signatures/current?role=${role}`),
 
-  uploadSignature: (role: string, file: File) => {
+  uploadSignature: async (role: string, file: File) => {
+    const user = getStoredUser<{ id: string }>();
+    if (!user) throw new Error('Please sign in before uploading a signature.');
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('role', role);
-    return api.upload<{ message: string; url: string }>('/signatures', formData);
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
+    const uploaded = await api.upload<{ url: string }>(`/storage/v1/object/signatory-signatures/${user.id}/${role}-${Date.now()}.${extension}`, formData);
+    await api.post('/signatures', { signatory_role: role, signature_url: uploaded.url });
+    return { message: 'Signature saved', url: uploaded.url };
   },
 };
