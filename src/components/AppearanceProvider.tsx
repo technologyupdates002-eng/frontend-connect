@@ -1,15 +1,25 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { APPEARANCE_STORAGE_KEY, BACKGROUND_INTERVAL_MS, MORNING_DURATION_MS, MORNING_STORAGE_KEY, nairobiDay, nextBackground, readAppearanceIndex, shouldShowMorning } from '@/lib/appearance';
-import { Button } from '@/components/ui';
-import { Pause, Play } from 'lucide-react';
+import { Button, Modal } from '@/components/ui';
+import { Pause, Play, Settings, Check } from 'lucide-react';
+import { appearanceApi } from '@/api/appearance';
+import { getStoredUser } from '@/api/client';
+import sky from '@/assets/themes/sky.png.asset.json';
+import noir from '@/assets/themes/noir.png.asset.json';
+import lantern from '@/assets/themes/lantern.png.asset.json';
+import ember from '@/assets/themes/ember.png.asset.json';
+import scarlet from '@/assets/themes/scarlet.png.asset.json';
+import moon from '@/assets/themes/moon.png.asset.json';
 
-export type AppearanceTheme = { name: string; theme: string; url: string; swatch: string };
+export type AppearanceTheme = { name: string; theme: string; url: string; dark: boolean };
 
 export const backgrounds: AppearanceTheme[] = [
-  { name: 'Sky', theme: 'sky', url: '/images/themes/sky.webp', swatch: '#42aabc' },
-  { name: 'Golden', theme: 'gold', url: '/images/themes/gold.webp', swatch: '#c78c27' },
-  { name: 'Crimson', theme: 'crimson', url: '/images/themes/crimson.png', swatch: '#ac193c' },
-  { name: 'Pearl', theme: 'pearl', url: '/images/themes/pearl.webp', swatch: '#b59b55' },
+  { name: 'Sky', theme: 'sky', url: sky.url, dark: false },
+  { name: 'Noir Bloom', theme: 'noir', url: noir.url, dark: true },
+  { name: 'Lantern', theme: 'lantern', url: lantern.url, dark: true },
+  { name: 'Ember', theme: 'ember', url: ember.url, dark: true },
+  { name: 'Scarlet', theme: 'scarlet', url: scarlet.url, dark: true },
+  { name: 'Moonlight', theme: 'moon', url: moon.url, dark: true },
 ];
 
 type AppearanceContextValue = {
@@ -17,25 +27,31 @@ type AppearanceContextValue = {
   paused: boolean;
   select: (index: number) => void;
   toggle: () => void;
+  error: string;
+  saving: boolean;
 };
 
-const AppearanceContext = createContext<AppearanceContextValue>({ index: 0, paused: false, select: () => {}, toggle: () => {} });
+const AppearanceContext = createContext<AppearanceContextValue>({ index: 0, paused: false, select: () => {}, toggle: () => {}, error: '', saving: false });
 
 export function useAppearance() {
   return useContext(AppearanceContext);
 }
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
-  const [index, setIndex] = useState(() => {
-    try {
-      return readAppearanceIndex(localStorage.getItem(APPEARANCE_STORAGE_KEY), backgrounds.length);
-    } catch {
-      return 0;
-    }
-  });
+  const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [showMorning, setShowMorning] = useState(false);
   const [morningReady, setMorningReady] = useState(false);
+
+  useEffect(() => {
+    try { setIndex(readAppearanceIndex(localStorage.getItem(APPEARANCE_STORAGE_KEY), backgrounds.length)); } catch { /* Device storage unavailable. */ }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.appearanceMode = backgrounds[index].dark ? 'dark' : 'light';
+  }, [index]);
 
   useEffect(() => {
     try {
@@ -78,10 +94,43 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     meta?.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--brand').trim());
   }, [index]);
 
-  const select = (nextIndex: number) => setIndex(Math.max(0, Math.min(nextIndex, backgrounds.length - 1)));
+  const save = async (nextIndex: number, nextPaused: boolean) => {
+    const user = getStoredUser<{ id: string }>();
+    if (!user || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      const result = await appearanceApi.save(user.id, { theme: backgrounds[nextIndex].theme, paused: nextPaused });
+      const savedIndex = backgrounds.findIndex(background => background.theme === result.theme);
+      setIndex(savedIndex >= 0 ? savedIndex : 0);
+      setPaused(result.paused);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Theme could not be saved.'); }
+    finally { setSaving(false); }
+  };
+  const select = (nextIndex: number) => { void save(Math.max(0, Math.min(nextIndex, backgrounds.length - 1)), true); };
+
+  useEffect(() => {
+    let loadedId: string | null = null;
+    let active = true;
+    const load = () => {
+      const user = getStoredUser<{ id: string }>();
+      if (!user) { loadedId = null; return; }
+      if (loadedId === user.id) return;
+      loadedId = user.id;
+      void appearanceApi.get(user.id).then(preferences => {
+        if (!active || getStoredUser<{ id: string }>()?.id !== user.id) return;
+        const savedIndex = backgrounds.findIndex(background => background.theme === preferences.theme);
+        setIndex(savedIndex >= 0 ? savedIndex : 0);
+        setPaused(preferences.paused);
+      }).catch(() => { if (active) setError('Saved theme could not be loaded.'); });
+    };
+    load();
+    const timer = window.setInterval(load, 1000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
 
   return (
-    <AppearanceContext.Provider value={{ index, paused, select, toggle: () => setPaused(value => !value) }}>
+    <AppearanceContext.Provider value={{ index, paused, select, toggle: () => { void save(index, !paused); }, error, saving }}>
       <div className="floral-backdrop" aria-hidden="true">
         {backgrounds.map((background, i) => <img key={background.theme} src={background.url} alt="" className={i === index ? 'floral-frame is-visible' : 'floral-frame'} />)}
       </div>
@@ -94,26 +143,30 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
 }
 
 export function AppearanceControls() {
-  const { index, paused, select, toggle } = useAppearance();
+  const { index, paused, select, toggle, saving } = useAppearance();
+  const [open, setOpen] = useState(false);
   return <div className="appearance-controls" aria-label="Background theme">
-    {backgrounds.map((background, i) => <Button key={background.theme} variant="ghost" className={`theme-swatch swatch-${background.theme} ${index === i ? 'is-selected' : ''}`} aria-label={`${background.name} background`} aria-pressed={index === i} title={`${background.name} background`} onClick={() => select(i)}><span /></Button>)}
+    {backgrounds.map((background, i) => <Button key={background.theme} variant="ghost" disabled={saving} className={`theme-swatch swatch-${background.theme} ${index === i ? 'is-selected' : ''}`} aria-label={`${background.name} background`} aria-pressed={index === i} title={`${background.name} background`} onClick={() => select(i)}><span /></Button>)}
     <Button variant="ghost" className="theme-pause" onClick={toggle} aria-label={paused ? 'Resume backgrounds' : 'Pause backgrounds'} title={paused ? 'Resume backgrounds' : 'Pause backgrounds'}>{paused ? <Play size={13} /> : <Pause size={13} />}</Button>
+    <Button variant="ghost" className="theme-pause" onClick={() => setOpen(true)} aria-label="Theme settings" title="Theme settings"><Settings size={16} /></Button>
+    <Modal open={open} onClose={() => setOpen(false)} title="Set your theme" size="lg"><AppearanceSettings /></Modal>
   </div>;
 }
 
 export function AppearanceSettings() {
-  const { index, paused, select, toggle } = useAppearance();
+  const { index, paused, select, toggle, error, saving } = useAppearance();
   return (
     <div className="appearance-settings-grid">
       {backgrounds.map((background, i) => (
-        <button key={background.theme} type="button" className={`appearance-option ${index === i ? 'is-selected' : ''}`} aria-pressed={index === i} onClick={() => select(i)}>
+        <Button key={background.theme} variant="ghost" type="button" disabled={saving} className={`appearance-option ${index === i ? 'is-selected' : ''}`} aria-pressed={index === i} onClick={() => select(i)}>
           <img src={background.url} alt="" />
           <span className="appearance-option-overlay" />
           <span className="appearance-option-label">{background.name}</span>
-          {index === i && <span className="appearance-option-check">Selected</span>}
-        </button>
+          {index === i && <span className="appearance-option-check"><Check size={12} /> Selected</span>}
+        </Button>
       ))}
-      <Button type="button" variant="secondary" className="appearance-pause" onClick={toggle}>{paused ? <Play size={15} /> : <Pause size={15} />} {paused ? 'Resume carousel' : 'Pause carousel'}</Button>
+      <Button type="button" variant="secondary" disabled={saving} className="appearance-pause" onClick={toggle}>{paused ? <Play size={15} /> : <Pause size={15} />} {paused ? 'Resume carousel' : 'Pause carousel'}</Button>
+      {error && <p role="alert" className="appearance-pause text-muted-foreground">{error}</p>}
     </div>
   );
 }
